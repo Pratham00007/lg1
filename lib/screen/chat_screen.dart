@@ -61,6 +61,15 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
+
+  String _formatPrompt(String text) {
+    return """ user wrote this " $text ". answer that and 
+add that location coordinates in square brackets at the end of answer
+For example: 'if user asked what is london population then answer will be like London population is 2 million.[51.5074°N, 0.1278°W]'.
+
+Keep the response concise.""";
+  }
+
   Future<void> _handleSubmitted(String text) async {
     if (text.isEmpty) return;
 
@@ -105,11 +114,16 @@ class _ChatScreenState extends State<ChatScreen> {
           "contents": [
             {
               "parts": [
-                {"text": text},
+                {"text": _formatPrompt(text)},
               ],
             },
           ],
-          "generationConfig": {"temperature": 0.7, "maxOutputTokens": 800},
+          "generationConfig": {
+            "temperature": 0.7,
+            "maxOutputTokens": 800,
+            "topP": 0.8,
+            "topK": 40,
+          },
         }),
       );
 
