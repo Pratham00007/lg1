@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:lg/screen/settings.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -19,9 +21,8 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _isLoading = false;
   bool _isSpeaking = false;
 
-  static const String apikey = "AIzaSyDrSXLmvqSRTXS56BWnBTh8V1Qekhjjo1U";
   static const String apiUrl =
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apikey}";
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=";
 
   @override
   void initState() {
@@ -63,19 +64,42 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _handleSubmitted(String text) async {
     if (text.isEmpty) return;
 
-    _textController.clear();
-    setState(() {
-      _messages.add(
-        ChatMessage(text: text, isUser: true, timestamp: DateTime.now()),
-      );
-      _isLoading = true;
-    });
-    _scrollToBottom();
-
-    // Generate AI response
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final apiKey = prefs.getString('gemini_api_key');
+
+      if (apiKey == null || apiKey.isEmpty) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Please set your API key in settings'),
+            action: SnackBarAction(
+              label: 'Settings',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SettingsScreen(),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+        return;
+      }
+
+      _textController.clear();
+      setState(() {
+        _messages.add(
+          ChatMessage(text: text, isUser: true, timestamp: DateTime.now()),
+        );
+        _isLoading = true;
+      });
+      _scrollToBottom();
+
       final response = await http.post(
-        Uri.parse(apiUrl),
+        Uri.parse("$apiUrl$apiKey"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "contents": [
@@ -85,52 +109,66 @@ class _ChatScreenState extends State<ChatScreen> {
               ],
             },
           ],
+          "generationConfig": {"temperature": 0.7, "maxOutputTokens": 800},
         }),
       );
 
+      if (!mounted) return;
+
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        String generatedText =
-            data["candidates"][0]["content"]["parts"][0]["text"];
 
-        setState(() {
-          _messages.add(
-            ChatMessage(
-              text: generatedText,
-              isUser: false,
-              timestamp: DateTime.now(),
-            ),
-          );
-        });
+        if (data["candidates"] != null &&
+            data["candidates"].isNotEmpty &&
+            data["candidates"][0]["content"] != null) {
+          String generatedText =
+              data["candidates"][0]["content"]["parts"][0]["text"];
 
-        // Automatically start speaking the response
-        await _speak(generatedText);
+          setState(() {
+            _messages.add(
+              ChatMessage(
+                text: generatedText,
+                isUser: false,
+                timestamp: DateTime.now(),
+              ),
+            );
+          });
+
+          await _speak(generatedText);
+        } else {
+          throw Exception("Invalid response format from API");
+        }
       } else {
-        setState(() {
-          _messages.add(
-            ChatMessage(
-              text: "Error: ${response.statusCode}",
-              isUser: false,
-              timestamp: DateTime.now(),
-            ),
-          );
-        });
+        final errorData = jsonDecode(response.body);
+        throw Exception(
+          "Error ${response.statusCode}: ${errorData['error']['message']}",
+        );
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _messages.add(
           ChatMessage(
-            text: "Failed to generate response: $e",
+            text: "Error: ${e.toString()}",
             isUser: false,
             timestamp: DateTime.now(),
           ),
         );
       });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
+      );
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
-      _scrollToBottom();
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _scrollToBottom();
+      }
     }
   }
 
@@ -153,7 +191,10 @@ class _ChatScreenState extends State<ChatScreen> {
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             onPressed: () {
-              // Add settings functionality
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
             },
           ),
         ],
