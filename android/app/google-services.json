@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "267108282608",
+    "project_id": "liquid1-67249",
+    "storage_bucket": "liquid1-67249.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:267108282608:android:fa201d89d3ed4e8eb55235",
+        "android_client_info": {
+          "package_name": "com.example.lg"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCnRCnI07P9Ogqe6ZZ0Kw_XjLViyl5NPUY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
